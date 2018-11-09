@@ -1,0 +1,104 @@
+#include"matrix.h"
+#include<iostream>
+#include"advection.h"
+#include"reinitialization.h"
+#include"init.h"
+#include<fstream>
+#include<memory>
+#include"utility.h"
+#include"flow.h"
+int main(){
+	std::unique_ptr<advection> padv(new advection("WENO-5"));
+	std::unique_ptr<reinitialize> prein(new reinitialize);
+	std::unique_ptr<utility> putil(new utility);
+	std::unique_ptr<flow> pflow(new flow);
+//	std::vector<double> x(5);
+//	x[0] = 0.5; x[1] = 0.75; x[2] = 0.15; x[3] = 0.05; x[4] = 0.25;
+//	init pp1("zalesak", x);
+	std::vector<double> x(3);
+	x[0] = 0.2; x[1] = 0.2; x[2] = 0.1;
+	init pp1("circle", x);
+
+//	std::vector<double> x(1);
+//	x[0] = 0.5;
+//	init pp1("plane", x);
+	double dt;
+	int M = 128;
+	int N = 128;
+	double dx = 1.0/M;
+	double dy = 1.0/N;
+	std::vector<double> y(2);
+	std::vector<std::vector<double>> xy, vel_x, vel_y;
+	xy.resize(M+6);
+	for(auto i=0; i<M+6; i++) xy[i].resize(N+6);
+	vel_x.resize(M);
+	vel_y.resize(M);
+	for(auto i=0; i<M; i++){
+		vel_x[i].resize(N);
+		vel_y[i].resize(N);
+	}
+	for(auto i=0; i<M; i++){
+		for(auto j=0; j<N; j++){
+			vel_x[i][j] = 1.0;
+			vel_y[i][j] = 0.0;
+		}
+	}
+//	for(auto j=0; j<N; j++){
+//		vel_x[0][j] = 1.0;
+//		vel_x[M-1][j] = 1.0;
+//		vel_y[0][j] = 0.0;
+//		vel_y[M-1][j] = 0.0;
+//	}
+//	for(auto i=0; i<M; i++){
+//		vel_x[i][0] = 1.0;
+//		vel_x[i][N-1] = 1.0;
+//		vel_y[i][0] = 0.0;
+//		vel_y[i][N-1] = 0.0;
+//	}
+	for(auto i=3; i<M+3; i++){
+		for(auto j=3; j<N+3; j++){
+			y[0] = (i-3.0+0.5)*dx;
+			y[1] = (j-3.0+0.5)*dy;
+			xy[i][j] = pp1.phi_init_value("circle",y);
+		}
+	}
+	double xi;
+	double yj;
+	for(auto i=0; i<M; i++){
+		for(auto j=0; j<N; j++){
+			xi = (i+0.5) * dx;
+			yj = (j+0.5) * dy;
+			vel_x[i][j] = 0.5 - yj;
+			vel_y[i][j] = xi  - 0.5;
+		}
+	}
+	double pi = 4.0*atan(1.0);
+	dt = 1.0*pi / 628.0;
+//	dt = 0.5*pi / 628.0;
+//	dt = 0.001;
+	for(auto idt=0; idt<628; idt++){
+		std::cout<<idt<<std::endl;
+/*		for(auto i=0; i<M; i++){
+			for(auto j=0; j<N; j++){
+				xi = (i+0.5) * dx;
+				yj = (j+0.5) * dy;
+	vel_x[i][j] = -2.0*pow(sin(pi*xi),2)*sin(pi*yj)*cos(pi*yj)*cos(idt*dt*pi/8.0);
+	vel_y[i][j] =  2.0*pow(sin(pi*yj),2)*sin(pi*xi)*cos(pi*xi)*cos(idt*dt*pi/8.0);
+			}
+		}*/
+		padv->advect_sol(dt, dx, dy, vel_x, vel_y, xy);
+		if(prein->trigger_reinitialize(dx, dy, 0, xy)){
+			prein->pde_reinit(dt, dx, dy, xy);
+		}
+	}
+	std::ofstream myfile;
+	myfile.open("out.dat");
+	for(auto i=3; i<M+3; i++){
+		for(auto j=3; j<N+3; j++){
+			myfile<<xy[i][j]<<'\t';
+		}
+		myfile<<std::endl;
+	}
+	myfile.close();
+	return 0;
+}

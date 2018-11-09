@@ -1,0 +1,120 @@
+#include"matrix.h"
+#include<iostream>
+#include"advection.h"
+#include"reinitialization.h"
+#include"init.h"
+#include<fstream>
+#include<memory>
+#include"utility.h"
+#include"flow.h"
+#include"time_step.h"
+int main(){
+	std::unique_ptr<advection> padv(new advection("WENO-5"));
+	std::unique_ptr<reinitialize> prein(new reinitialize);
+	std::unique_ptr<utility> putil(new utility);
+	std::unique_ptr<flow> pflow(new flow);
+	std::unique_ptr<time_step> ptime(new time_step);
+	double rho_l = 1000.0;
+	double mu_l  = 0.001;
+	double rho_g = 100.0;
+	double mu_g  = 18.0e-6;
+//	std::vector<double> x(5);
+//	x[0] = 0.5; x[1] = 0.75; x[2] = 0.15; x[3] = 0.05; x[4] = 0.25;
+//	init pp1("zalesak", x);
+//	std::vector<double> x(3);
+//	x[0] = 0.5; x[1] = 0.5; x[2] = 0.1;
+//	init pp1("circle", x);
+	double CFL = 0.25;
+	std::vector<double> x(1);
+	x[0] = 0.5;
+	init pp1("plane", x);
+	double dt;
+	int M = 200;
+	int N = 200;
+	double dx = 1.0/M;
+	double dy = 1.0/N;
+	std::vector<double> y(2);
+	std::vector<std::vector<double>> xy, vel_x, vel_y;
+	xy.resize(M+6);
+	for(auto i=0; i<M+6; i++) xy[i].resize(N+6);
+//*****************************
+	vel_x.resize(M+7);
+	vel_y.resize(M+6);
+	for(auto i=0; i<M+7; i++){
+		vel_x[i].resize(N+6);
+	}
+	for(auto i=0; i<M+6; i++){
+		vel_y[i].resize(N+7);
+	}
+//*****************************
+
+	for(auto i=0; i<M+7; i++){
+		for(auto j=0; j<N+6; j++){
+			vel_x[i][j] = 1.0;
+		}
+	}
+
+	for(auto i=0; i<M+6; i++){
+		for(auto j=0; j<N+7; j++){
+			vel_y[i][j] = 0.0;
+		}
+	}
+	
+//	for(auto j=0; j<N; j++){
+//		vel_x[0][j] = 1.0;
+//		vel_x[M-1][j] = 1.0;
+//		vel_y[0][j] = 0.0;
+//		vel_y[M-1][j] = 0.0;
+//	}
+//	for(auto i=0; i<M; i++){
+//		vel_x[i][0] = 1.0;
+//		vel_x[i][N-1] = 1.0;
+//		vel_y[i][0] = 0.0;
+//		vel_y[i][N-1] = 0.0;
+//	}
+	for(auto i=3; i<M+3; i++){
+		for(auto j=3; j<N+3; j++){
+			y[0] = (i-3.0+0.5)*dx;
+			y[1] = (j-3.0+0.5)*dy;
+			xy[i][j] = pp1.phi_init_value("plane",y);
+		}
+	}
+/*	double xi;
+	double yj;
+	double pi = 4.0*atan(1.0);
+	for(auto i=1; i<M-1; i++){
+		for(auto j=1; j<N-1; j++){
+			xi = (i+0.5) * dx;
+			yj = (j+0.5) * dy;
+//			vel_x[i][j] = 0.5 - yj;
+//			vel_y[i][j] = xi - 0.5;
+		}
+	}*/
+
+	dt = 0.0005;
+//	dt = ptime->stable_time(vel_x,vel_y,dx,dy,CFL);
+//	dt = 0.1;
+	dt = 0.001;
+	for(auto idt=0; idt<100; idt++){
+		std::cout<<"time step  "<<idt+1<<"  of  "<<400<<std::endl;
+/*		for(auto i=0; i<M; i++){
+			for(auto j=0; j<N; j++){
+				xi = (i+0.5) * dx;
+				yj = (j+0.5) * dy;
+	vel_x[i][j] = -2.0*pow(sin(pi*xi),2)*sin(pi*yj)*cos(pi*yj)*cos(idt*dt*pi/8.0);
+	vel_y[i][j] =  2.0*pow(sin(pi*yj),2)*sin(pi*xi)*cos(pi*xi)*cos(idt*dt*pi/8.0);
+			}
+		}*/
+		ptime->simulate(dt, dx, dy, CFL, vel_x, vel_y, xy);
+	}
+	std::ofstream myfile;
+	myfile.open("out.dat");
+	for(auto i=3; i<M+3; i++){
+		for(auto j=3; j<N+3; j++){
+			myfile<<xy[i][j]<<'\t';
+		}
+		myfile<<std::endl;
+	}
+	myfile.close();
+	return 0;
+}
